@@ -1,0 +1,40 @@
+{
+  "name": "@comfyui-ops/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ComfyUI 编排后端：任务状态机、轮询、图片回传、用量与结算、CSV 流式导出",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "db:setup": "tsx src/db/setup.ts",
+    "db:seed": "tsx src/db/seedCli.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.4.3",
+    "better-sqlite3": "^13.2.0",
+    "fastify": "^5.12.8",
+    "knex": "^3.3.0",
+    "mysql2": "^3.15.0",
+    "pg": "^8.16.0",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.5",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.1.0",
+    "supertest": "^7.3.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

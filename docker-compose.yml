@@ -1,0 +1,110 @@
+# ============================================================================
+# ComfyUI 算力运营控制台 · Docker Compose 参考编排
+#
+# 说明：
+#   - 本机开发环境没有 Docker，此文件按标准三服务拓扑编写，未在本机验证；
+#     本地运行请优先使用 docs/runbook-local.md 的 npm 流程。
+#   - 默认 SQLite（卷持久化），MySQL 作为可选 profile：
+#       docker compose --profile mysql up --build
+#     启动 MySQL 后把 server 的 DATABASE_URL 指向 mysql 服务即可切换。
+# ============================================================================
+name: comfyui-ops-console
+
+services:
+  mock:
+    build:
+      context: .
+      target: mock
+    image: comfyui-ops/mock:1.0.0
+    environment:
+      MOCK_PORT: "8188"
+      MOCK_HOST: 0.0.0.0
+      MOCK_MODE: ok
+      MOCK_SLOW_MS: "5000"
+      MOCK_JOB_DURATION_MS: "3000"
+    ports:
+      - "8188:8188"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8188/system_stats >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      target: server
+    image: comfyui-ops/server:1.0.0
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_CLIENT: sqlite
+      DB_FILENAME: /data/app.db
+      STORAGE_DIR: /storage
+      COMFYUI_BASE_URL: http://mock:8188
+      COMFYUI_POLL_INTERVAL_MS: "800"
+      COMFYUI_JOB_TIMEOUT_MS: "60000"
+      COMFYUI_MAX_RETRIES: "3"
+      ORCHESTRATOR_CONCURRENCY: "2"
+      THUMBNAIL_SIZE: "256"
+      TOKEN_TTL_SECONDS: "43200"
+      # 生产部署务必替换为随机密钥，并限制 CORS 来源
+      JWT_SECRET: please-change-me-in-production
+      LOG_LEVEL: info
+    volumes:
+      - server-data:/data
+      - server-storage:/storage
+    ports:
+      - "3000:3000"
+    depends_on:
+      mock:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+    image: comfyui-ops/web:1.0.0
+    ports:
+      - "8080:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 可选：MySQL 8（profile=mysql），schema 由 db/schema.mysql.sql 初始化
+  mysql:
+    image: mysql:8.0
+    profiles: ["mysql"]
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: root-change-me
+      MYSQL_DATABASE: comfyui_ops
+      MYSQL_USER: comfyui
+      MYSQL_PASSWORD: comfyui-change-me
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/schema.mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-change-me --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  server-data:
+  server-storage:
+  mysql-data:
